@@ -29,27 +29,26 @@
     <header>Gestão de Ocorrências (MongoDB)</header>
     <div class="container">
       <div class="top-bar">
-        <input type="text" id="filtro"
-          placeholder="Filtrar por nome do aluno..." oninput="filtrar()" />
+        <input type="text" id="filtro" placeholder="Filtrar por nome do aluno..." oninput="filtrar()" />
         <div>
-          <button class="btn btn-bulk" onclick="selecionarTudo()">Selecionar
-            tudo</button>
-          <button class="btn btn-bulk" onclick="excluirSelecionados()">Excluir
-            selecionados</button>
+          <button class="btn btn-bulk" onclick="selecionarTudo()">Selecionar tudo</button>
+          <button class="btn btn-bulk" onclick="excluirSelecionados()">Excluir selecionados</button>
         </div>
       </div>
-      <div class="summary" id="resumo">Total: 0 ocorrências | 0 alunos únicos |
-        0 selecionadas</div>
+      <div class="summary" id="resumo">Total: 0 ocorrências | 0 alunos únicos | 0 selecionadas</div>
       <div id="listaOcorrencias">Carregando...</div>
       <canvas id="grafico" width="920" height="300"></canvas>
     </div>
 
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
     let todas = [], selecionadas = new Set();
+
+    function extrairNomeOriginal(nomeComData) {
+      return nomeComData.split(" - ").slice(1).join(" - ") || nomeComData;
+    }
 
     async function carregarOcorrencias() {
       const container = document.getElementById("listaOcorrencias");
@@ -66,7 +65,9 @@
       const alunoContador = {};
 
       lista.forEach((data) => {
-        alunoContador[data.nomeAluno] = (alunoContador[data.nomeAluno] || 0) + 1;
+        const nomeOriginal = extrairNomeOriginal(data.nomeAluno);
+        alunoContador[nomeOriginal] = (alunoContador[nomeOriginal] || 0) + 1;
+
         const div = document.createElement("div");
         div.className = "ocorrencia";
         div.innerHTML = `
@@ -74,7 +75,7 @@
           <div class="info">
             <table>
               <tr><th>Campo</th><th>Informação</th></tr>
-              <tr><td>Aluno</td><td>${data.nomeAluno}</td></tr>
+              <tr><td>Aluno</td><td>${nomeOriginal}</td></tr>
               <tr><td>Série</td><td>${data.serie}</td></tr>
               <tr><td>Professor</td><td>${data.professor}</td></tr>
               <tr><td>Data</td><td>${new Date(data.dataHora).toLocaleString()}</td></tr>
@@ -83,7 +84,7 @@
             </table>
           </div>
           <div class="actions">
-            <button class="btn btn-pdf" onclick="gerarPDF('${data.nomeAluno}', '${data.serie}', '${data.professor}', '${new Date(data.dataHora).toLocaleString()}', \`${(data.ocorrencias || []).join(", " )}\`, \`${data.descricao || ""}\`)">PDF</button>
+            <button class="btn btn-pdf" onclick="gerarPDF('${nomeOriginal}', '${data.serie}', '${data.professor}', '${new Date(data.dataHora).toLocaleString()}', \`${(data.ocorrencias || []).join(", " )}\`, \`${data.descricao || ""}\`)">PDF</button>
           </div>
         `;
         container.appendChild(div);
@@ -115,43 +116,39 @@
       document.getElementById("resumo").textContent = `Total: ${total} ocorrências | ${alunos} alunos únicos | ${selecionadas.size} selecionadas`;
     }
 
-   function gerarPDF(nome, serie, professor, data, ocorrencias, descricao) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+    function gerarPDF(nome, serie, professor, data, ocorrencias, descricao) {
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.setFillColor(240, 240, 240);
+      doc.rect(10, 10, 190, 100, 'F');
+      doc.setFontSize(14);
+      doc.setTextColor(0, 60, 112);
+      doc.text(`Registro de Ocorrência`, 20, 20);
 
-  doc.setFillColor(240, 240, 240);
-  doc.rect(10, 10, 190, 100, 'F'); // fundo cinza claro para o bloco de dados
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      const rows = [
+        ['Campo', 'Informação'],
+        ['Aluno', nome],
+        ['Série', serie],
+        ['Professor', professor],
+        ['Data', data],
+        ['Ocorrências', ocorrencias],
+        ['Descrição', descricao]
+      ];
 
-  doc.setFontSize(14);
-  doc.setTextColor(0, 60, 112);
-  doc.text(`Registro de Ocorrência`, 20, 20);
+      let y = 30;
+      rows.forEach(([label, value]) => {
+        doc.setFont(undefined, 'bold');
+        doc.text(`${label}:`, 20, y);
+        doc.setFont(undefined, 'normal');
+        const lines = doc.splitTextToSize(value, 120);
+        doc.text(lines, 60, y);
+        y += (lines.length * 10);
+      });
 
-  doc.setFontSize(11);
-  doc.setTextColor(0);
-  const rows = [
-    ['Campo', 'Informacão'],
-    ['Aluno', nome],
-    ['Série', serie],
-    ['Professor', professor],
-    ['Data', data],
-    ['Ocorrências', ocorrencias],
-    ['Descrição', descricao]
-  ];
-
-  let y = 30;
-  rows.forEach(([label, value]) => {
-    doc.setFont(undefined, 'bold');
-doc.text(`${label}:`, 20, y);
-doc.setFont(undefined, 'normal');
-
-const lines = doc.splitTextToSize(value, 120); // quebra com no máximo 120px
-doc.text(lines, 60, y);
-y += (lines.length * 10); // pula de acordo com a quantidade de linhas
-
-  });
-
-  doc.save(`Ocorrencia_${nome}.pdf`);
-}
+      doc.save(`Ocorrencia_${nome}.pdf`);
+    }
 
     function gerarGrafico(dados) {
       const ctx = document.getElementById("grafico").getContext("2d");
@@ -178,7 +175,7 @@ y += (lines.length * 10); // pula de acordo com a quantidade de linhas
 
     function filtrar() {
       const termo = document.getElementById("filtro").value.toLowerCase();
-      const filtradas = todas.filter(o => o.nomeAluno.toLowerCase().includes(termo));
+      const filtradas = todas.filter(o => extrairNomeOriginal(o.nomeAluno).toLowerCase().includes(termo));
       mostrarOcorrencias(filtradas);
     }
 
