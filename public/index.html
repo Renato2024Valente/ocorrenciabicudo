@@ -112,13 +112,13 @@
   </style>
 </head>
 <body>
-  
+  <audio id="alertaSom" src="notificacao.mp3" preload="auto"></audio>
   <script>
-
-      let ultimaOcorrenciaID = null;
+let ultimaOcorrenciaID = null;
 let piscando = false;
 let alertaInterval = null;
 let originalTitle = document.title;
+let primeiraVez = true;
 
 function iniciarAlertaNovaOcorrencia() {
   if (piscando) return;
@@ -128,7 +128,8 @@ function iniciarAlertaNovaOcorrencia() {
     document.title = estado ? "🟥 NOVA OCORRÊNCIA 🟨" : "⚠️ ATENÇÃO!";
     estado = !estado;
   }, 700);
-  document.getElementById("alertaSom").play();
+  const audio = document.getElementById("alertaSom");
+  if (audio) audio.play();
 }
 
 function pararAlerta() {
@@ -140,25 +141,36 @@ function pararAlerta() {
 async function verificarNovasOcorrencias() {
   const baseUrl = location.hostname.includes("localhost")
     ? "http://localhost:3000"
-    : "https://ocorrenciaservidor.onrender.com";
+    : "https://ocorrenciabicudo.onrender.com"; // ajuste aqui se necessário
 
-  const res = await fetch(`${baseUrl}/ocorrencias`);
-  const data = await res.json();
+  try {
+    const res = await fetch(`${baseUrl}/ocorrencias`);
+    const data = await res.json();
 
-  const novaMaisRecente = data[0]?._id; // 👈 primeiro definimos
+    const novaMaisRecente = data[0]?._id;
 
-  if (ultimaOcorrenciaID && novaMaisRecente !== ultimaOcorrenciaID) {
-    iniciarAlertaNovaOcorrencia(); // 👈 depois comparamos
+    if (!primeiraVez && ultimaOcorrenciaID && novaMaisRecente !== ultimaOcorrenciaID) {
+      iniciarAlertaNovaOcorrencia();
+    }
+
+    ultimaOcorrenciaID = novaMaisRecente;
+    window.todas = data;
+
+    if (typeof mostrarOcorrencias === "function") {
+      mostrarOcorrencias(data);
+    }
+
+    primeiraVez = false;
+  } catch (e) {
+    console.error("Erro ao verificar novas ocorrências:", e);
   }
+}
 
-  ultimaOcorrenciaID = novaMaisRecente;
-  window.todas = data;
-
-  if (typeof mostrarOcorrencias === "function") {
-    mostrarOcorrencias(data);
-  }
-} // ✅ ESTA chave fecha a função corretamente
-  </script>
+// Executar a verificação inicial e depois a cada 5 segundos
+verificarNovasOcorrencias();
+setInterval(verificarNovasOcorrencias, 5000);
+window.addEventListener("click", pararAlerta);
+</script>
 
   
   <!-- Botão escondido para habilitar áudio -->
